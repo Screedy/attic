@@ -169,6 +169,9 @@ type Collection struct {
 	AssetCount     int       `json:"asset_count"`
 }
 
+// DefaultCurrency is used for assets created without an explicit currency
+const DefaultCurrency = "USD"
+
 // Asset represents a tracked item
 type Asset struct {
 	ID               uuid.UUID       `json:"id"`
@@ -187,6 +190,7 @@ type Asset struct {
 	Attributes       json.RawMessage `json:"attributes"`
 	PurchaseAt       *time.Time      `json:"purchase_at,omitempty"`
 	PurchasePrice    *float64        `json:"purchase_price,omitempty"`
+	Currency         string          `json:"currency"`
 	PurchaseNote     *string         `json:"purchase_note,omitempty"`
 	Notes            *string         `json:"notes,omitempty"`              // User personal notes about the asset
 	ImportPluginID   *string         `json:"import_plugin_id,omitempty"`   // Plugin that imported this asset

@@ -271,12 +271,9 @@ function formatBytes(bytes: number) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
-function formatCurrency(value?: number) {
+function formatCurrency(value?: number, currency?: string) {
   if (value === undefined || value === null) return '-'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(value)
+  return formatMoney(value, currency)
 }
 
 function daysUntilExpiry(endDate?: string) {
@@ -589,7 +586,7 @@ function getShortId(): string {
               </div>
               <div class="flex items-center justify-between p-4 transition-colors hover:bg-mist-50 dark:hover:bg-mist-700/50">
                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Purchase Price</span>
-                <span class="text-sm font-bold text-mist-950 dark:text-white">{{ formatCurrency(asset.purchase_price) }}</span>
+                <span class="text-sm font-bold text-mist-950 dark:text-white">{{ formatCurrency(asset.purchase_price, asset.currency) }}</span>
               </div>
               <div class="flex items-center justify-between p-4 transition-colors hover:bg-mist-50 dark:hover:bg-mist-700/50">
                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</span>

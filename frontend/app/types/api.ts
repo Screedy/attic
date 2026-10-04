@@ -133,6 +133,7 @@ export interface Asset {
   attributes?: Record<string, unknown>
   purchase_at?: string
   purchase_price?: number
+  currency?: string
   purchase_note?: string
   notes?: string
   category?: Category
@@ -145,7 +146,7 @@ export interface Asset {
 }
 
 export interface AssetStats {
-  total_value: number
+  purchase_values: Record<string, number> // Purchase value (price * quantity) per currency code
 }
 
 export interface Warranty {

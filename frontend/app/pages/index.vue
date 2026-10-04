@@ -58,10 +58,6 @@ const assetsPageUrl = computed(() => dashboardUrls.value.inventory)
 const { data: assets } = useApi<{ assets: Asset[], total: number }>(() => assetsUrl.value)
 const { data: assetStats } = useApi<AssetStats>(() => assetStatsUrl.value)
 
-const formatCurrency = (value: number) => new Intl.NumberFormat('en-US', {
-  style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
-}).format(value)
-
 const greeting = computed(() => {
   const hour = new Date().getHours()
   if (hour < 12) return 'Good morning'
@@ -205,9 +201,10 @@ const quickLinks = computed(() => [
           <p class="text-xs font-bold uppercase tracking-[0.14em] text-white/85">
             Total purchase value
           </p>
-          <p class="mt-1 text-3xl font-black tracking-[-0.05em] sm:text-4xl">
-            {{ formatCurrency(assetStats?.total_value || 0) }}
-          </p>
+          <PurchaseValues
+            :values="assetStats?.purchase_values || {}"
+            class="mt-1 text-2xl font-black tracking-[-0.05em] sm:text-3xl"
+          />
         </div>
         <div class="grid grid-cols-3 overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm">
           <NuxtLink

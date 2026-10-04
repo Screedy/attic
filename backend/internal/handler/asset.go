@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type CreateAssetRequest struct {
 	Attributes    json.RawMessage `json:"attributes,omitempty"`
 	PurchaseAt    *string         `json:"purchase_at,omitempty"`
 	PurchasePrice *float64        `json:"purchase_price,omitempty"`
+	Currency      string          `json:"currency,omitempty"`
 	PurchaseNote  *string         `json:"purchase_note,omitempty"`
 	Notes         *string         `json:"notes,omitempty"`
 }
@@ -49,6 +51,7 @@ type UpdateAssetRequest struct {
 	Attributes    json.RawMessage `json:"attributes,omitempty"`
 	PurchaseAt    *string         `json:"purchase_at,omitempty"`
 	PurchasePrice *float64        `json:"purchase_price,omitempty"`
+	Currency      string          `json:"currency,omitempty"`
 	PurchaseNote  *string         `json:"purchase_note,omitempty"`
 	Notes         *string         `json:"notes,omitempty"`
 }
@@ -340,6 +343,10 @@ func (h *Handler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	asset.PurchasePrice = req.PurchasePrice
+	if !setCurrency(asset, req.Currency) {
+		writeError(w, http.StatusBadRequest, "currency must be a 3-letter ISO 4217 code")
+		return
+	}
 	asset.PurchaseNote = req.PurchaseNote
 	asset.Notes = req.Notes
 
@@ -499,6 +506,10 @@ func (h *Handler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		asset.PurchaseAt = nil
 	}
 	asset.PurchasePrice = req.PurchasePrice
+	if !setCurrency(asset, req.Currency) {
+		writeError(w, http.StatusBadRequest, "currency must be a 3-letter ISO 4217 code")
+		return
+	}
 	asset.PurchaseNote = req.PurchaseNote
 	asset.Notes = req.Notes
 	if features.Collections {
@@ -642,12 +653,42 @@ func (h *Handler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
+
+// setCurrency applies a requested ISO 4217 code; empty keeps the existing (or repository default) currency.
+func setCurrency(asset *domain.Asset, requested string) bool {
+	if requested == "" {
+		return true
+	}
+	code := strings.ToUpper(strings.TrimSpace(requested))
+	if !currencyPattern.MatchString(code) {
+		return false
+	}
+	asset.Currency = code
+	return true
+}
+
 func parseUUIDString(s string) (uuid.UUID, error) {
 	return uuid.Parse(s)
 }
 
 type AssetStatsResponse struct {
-	TotalValue float64 `json:"total_value"`
+	PurchaseValues map[string]float64 `json:"purchase_values"` // Purchase value (price × quantity) per currency code
+	// Deprecated: use PurchaseValues. Kept for clients written before multi-currency support;
+	// Omitted once assets use more than one currency, because their sum has no meaning.
+	TotalValue *float64 `json:"total_value,omitempty"`
+}
+
+func newAssetStatsResponse(purchaseValues map[string]float64) AssetStatsResponse {
+	resp := AssetStatsResponse{PurchaseValues: purchaseValues}
+	if len(purchaseValues) <= 1 {
+		var total float64
+		for _, value := range purchaseValues {
+			total = value
+		}
+		resp.TotalValue = &total // Deprecated field; kept for clients written before multi-currency support.
+	}
+	return resp
 }
 
 func (h *Handler) GetAssetStats(w http.ResponseWriter, r *http.Request) {
@@ -670,13 +711,11 @@ func (h *Handler) GetAssetStats(w http.ResponseWriter, r *http.Request) {
 		filter.LocationID = &id
 	}
 
-	totalValue, err := h.repos.Assets.GetTotalValue(r.Context(), h.orgID, filter)
+	purchaseValues, err := h.repos.Assets.GetPurchaseValues(r.Context(), h.orgID, filter)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get asset stats")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, AssetStatsResponse{
-		TotalValue: totalValue,
-	})
+	writeJSON(w, http.StatusOK, newAssetStatsResponse(purchaseValues))
 }

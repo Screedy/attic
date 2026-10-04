@@ -25,7 +25,7 @@ func NewAssetRepository(pool *pgxpool.Pool) *AssetRepository {
 func (r *AssetRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Asset, error) {
 	query := `
 		SELECT id, organization_id, category_id, location_id, condition_id, collection_id, main_attachment_id,
-		       name, description, quantity, attributes, purchase_at, purchase_price, purchase_note, notes,
+		       name, description, quantity, attributes, purchase_at, purchase_price, currency, purchase_note, notes,
 		       import_plugin_id, import_external_id, created_at, updated_at
 		FROM assets
 		WHERE id = $1 AND deleted_at IS NULL
@@ -33,7 +33,7 @@ func (r *AssetRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.As
 	var a domain.Asset
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&a.ID, &a.OrganizationID, &a.CategoryID, &a.LocationID, &a.ConditionID, &a.CollectionID, &a.MainAttachmentID,
-		&a.Name, &a.Description, &a.Quantity, &a.Attributes, &a.PurchaseAt, &a.PurchasePrice, &a.PurchaseNote, &a.Notes,
+		&a.Name, &a.Description, &a.Quantity, &a.Attributes, &a.PurchaseAt, &a.PurchasePrice, &a.Currency, &a.PurchaseNote, &a.Notes,
 		&a.ImportPluginID, &a.ImportExternalID, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -210,7 +210,7 @@ func (r *AssetRepository) List(ctx context.Context, orgID uuid.UUID, filter doma
 	// Get assets with related data
 	query := fmt.Sprintf(`
 		SELECT a.id, a.organization_id, a.category_id, a.location_id, a.condition_id, a.collection_id, a.main_attachment_id,
-		       a.name, a.description, a.quantity, a.attributes, a.purchase_at, a.purchase_price, a.purchase_note, a.notes, a.created_at, a.updated_at,
+		       a.name, a.description, a.quantity, a.attributes, a.purchase_at, a.purchase_price, a.currency, a.purchase_note, a.notes, a.created_at, a.updated_at,
 		       c.id, c.name, c.plugin_id,
 		       l.id, l.name,
 		       cond.id, cond.code, cond.label,
@@ -243,7 +243,7 @@ func (r *AssetRepository) List(ctx context.Context, orgID uuid.UUID, filter doma
 
 		if err := rows.Scan(
 			&a.ID, &a.OrganizationID, &a.CategoryID, &a.LocationID, &a.ConditionID, &a.CollectionID, &a.MainAttachmentID,
-			&a.Name, &a.Description, &a.Quantity, &a.Attributes, &a.PurchaseAt, &a.PurchasePrice, &a.PurchaseNote, &a.Notes, &a.CreatedAt, &a.UpdatedAt,
+			&a.Name, &a.Description, &a.Quantity, &a.Attributes, &a.PurchaseAt, &a.PurchasePrice, &a.Currency, &a.PurchaseNote, &a.Notes, &a.CreatedAt, &a.UpdatedAt,
 			&catID, &catName, &catPluginID,
 			&locID, &locName,
 			&condID, &condCode, &condLabel,
@@ -325,8 +325,8 @@ func (r *AssetRepository) Create(ctx context.Context, a *domain.Asset) error {
 	query := `
 		INSERT INTO assets (id, organization_id, category_id, location_id, condition_id, collection_id,
 		                    name, description, quantity, attributes, purchase_at, purchase_price, purchase_note, notes,
-		                    import_plugin_id, import_external_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		                    import_plugin_id, import_external_id, currency)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		RETURNING created_at, updated_at
 	`
 	if a.ID == uuid.Nil {
@@ -335,10 +335,13 @@ func (r *AssetRepository) Create(ctx context.Context, a *domain.Asset) error {
 	if a.Attributes == nil {
 		a.Attributes = []byte("{}")
 	}
+	if a.Currency == "" {
+		a.Currency = domain.DefaultCurrency
+	}
 	if err := tx.QueryRow(ctx, query,
 		a.ID, a.OrganizationID, a.CategoryID, a.LocationID, a.ConditionID, a.CollectionID,
 		a.Name, a.Description, a.Quantity, a.Attributes, a.PurchaseAt, a.PurchasePrice, a.PurchaseNote, a.Notes,
-		a.ImportPluginID, a.ImportExternalID,
+		a.ImportPluginID, a.ImportExternalID, a.Currency,
 	).Scan(&a.CreatedAt, &a.UpdatedAt); err != nil {
 		return err
 	}
@@ -366,7 +369,7 @@ func (r *AssetRepository) Update(ctx context.Context, a *domain.Asset) error {
 	query := `
 		UPDATE assets
 		SET category_id = $2, location_id = $3, condition_id = $4, collection_id = $5,
-		    name = $6, description = $7, quantity = $8, attributes = $9, purchase_at = $10, purchase_price = $11, purchase_note = $12, notes = $13
+		    name = $6, description = $7, quantity = $8, attributes = $9, purchase_at = $10, purchase_price = $11, purchase_note = $12, notes = $13, currency = $14
 		WHERE id = $1 AND deleted_at IS NULL
 		RETURNING updated_at
 	`
@@ -375,7 +378,7 @@ func (r *AssetRepository) Update(ctx context.Context, a *domain.Asset) error {
 	}
 	if err := tx.QueryRow(ctx, query,
 		a.ID, a.CategoryID, a.LocationID, a.ConditionID, a.CollectionID,
-		a.Name, a.Description, a.Quantity, a.Attributes, a.PurchaseAt, a.PurchasePrice, a.PurchaseNote, a.Notes,
+		a.Name, a.Description, a.Quantity, a.Attributes, a.PurchaseAt, a.PurchasePrice, a.PurchaseNote, a.Notes, a.Currency,
 	).Scan(&a.UpdatedAt); err != nil {
 		return err
 	}
@@ -539,20 +542,34 @@ func (r *AssetRepository) loadAssetTags(ctx context.Context, assets []*domain.As
 	return rows.Err()
 }
 
-func (r *AssetRepository) GetTotalValue(ctx context.Context, orgID uuid.UUID, filter domain.AssetFilter) (float64, error) {
+// GetPurchaseValues sums purchase price * quantity per currency; currencies are never mixed or converted.
+func (r *AssetRepository) GetPurchaseValues(ctx context.Context, orgID uuid.UUID, filter domain.AssetFilter) (map[string]float64, error) {
 	query := `
-		SELECT COALESCE(SUM(purchase_price * quantity), 0)
+		SELECT currency, SUM(purchase_price * quantity)
 		FROM assets
-		WHERE organization_id = $1 AND deleted_at IS NULL
+		WHERE organization_id = $1 AND deleted_at IS NULL AND purchase_price IS NOT NULL
 	`
 	args := []any{orgID}
 	if filter.LocationID != nil {
 		query += " AND location_id = $2"
 		args = append(args, *filter.LocationID)
 	}
-	var total float64
-	err := r.pool.QueryRow(ctx, query, args...).Scan(&total)
-	return total, err
+	query += " GROUP BY currency"
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	values := map[string]float64{}
+	for rows.Next() {
+		var currency string
+		var value float64
+		if err := rows.Scan(&currency, &value); err != nil {
+			return nil, err
+		}
+		values[currency] = value
+	}
+	return values, rows.Err()
 }
 
 func (r *AssetRepository) SetMainAttachment(ctx context.Context, assetID uuid.UUID, attachmentID *uuid.UUID) error {

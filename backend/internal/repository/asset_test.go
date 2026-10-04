@@ -95,6 +95,7 @@ func Test_AssetRepository_Create_WithAllFields(t *testing.T) {
 		Attributes:     attrs,
 		PurchaseAt:     &purchaseAt,
 		PurchasePrice:  &price,
+		Currency:       "CZK",
 		PurchaseNote:   &purchaseNote,
 	}
 
@@ -112,6 +113,9 @@ func Test_AssetRepository_Create_WithAllFields(t *testing.T) {
 	}
 	if fetched.PurchasePrice == nil || *fetched.PurchasePrice != 999.99 {
 		t.Error("expected purchase price to be set")
+	}
+	if fetched.Currency != "CZK" {
+		t.Errorf("expected currency CZK, got %q", fetched.Currency)
 	}
 }
 
@@ -554,7 +558,7 @@ func Test_AssetRepository_SetTags(t *testing.T) {
 	}
 }
 
-func Test_AssetRepository_GetTotalValue(t *testing.T) {
+func Test_AssetRepository_GetPurchaseValues(t *testing.T) {
 	ctx := context.Background()
 	if err := testDB.TruncateAll(ctx); err != nil {
 		t.Fatalf("failed to truncate: %v", err)
@@ -565,17 +569,19 @@ func Test_AssetRepository_GetTotalValue(t *testing.T) {
 	cat, _ := fixtures.CreateCategory(ctx, org.ID, "Electronics", nil)
 
 	repo := NewAssetRepository(testDB.Pool)
-	price1, price2 := 100.0, 200.0
+	price1, price2, price3 := 100.0, 200.0, 50.0
 	repo.Create(ctx, &domain.Asset{OrganizationID: org.ID, CategoryID: &cat.ID, Name: "Asset 1", Quantity: 2, PurchasePrice: &price1})
-	repo.Create(ctx, &domain.Asset{OrganizationID: org.ID, CategoryID: &cat.ID, Name: "Asset 2", Quantity: 1, PurchasePrice: &price2})
+	repo.Create(ctx, &domain.Asset{OrganizationID: org.ID, CategoryID: &cat.ID, Name: "Asset 2", Quantity: 1, PurchasePrice: &price2, Currency: "USD"})
+	repo.Create(ctx, &domain.Asset{OrganizationID: org.ID, CategoryID: &cat.ID, Name: "Asset 3", Quantity: 3, PurchasePrice: &price3, Currency: "EUR"})
+	repo.Create(ctx, &domain.Asset{OrganizationID: org.ID, CategoryID: &cat.ID, Name: "No price", Quantity: 1, Currency: "CZK"})
 
-	total, err := repo.GetTotalValue(ctx, org.ID, domain.AssetFilter{})
+	values, err := repo.GetPurchaseValues(ctx, org.ID, domain.AssetFilter{})
 	if err != nil {
-		t.Fatalf("failed to get total value: %v", err)
+		t.Fatalf("failed to get purchase values: %v", err)
 	}
 
-	// 2 * 100 + 1 * 200 = 400
-	if total != 400.0 {
-		t.Errorf("expected total value 400, got %f", total)
+	// USD: 2 * 100 (default currency) + 1 * 200 = 400; EUR: 3 * 50 = 150; CZK has no priced assets
+	if len(values) != 2 || values["USD"] != 400.0 || values["EUR"] != 150.0 {
+		t.Errorf("expected USD 400 and EUR 150, got %v", values)
 	}
 }
