@@ -655,13 +655,20 @@ func (h *Handler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
-// setCurrency applies a requested ISO 4217 code; empty keeps the existing (or repository default) currency.
+// normalizeCurrency trims and uppercases an ISO 4217 code; ok is false unless it is three letters.
+func normalizeCurrency(s string) (string, bool) {
+	code := strings.ToUpper(strings.TrimSpace(s))
+	return code, currencyPattern.MatchString(code)
+}
+
+// setCurrency applies a requested ISO 4217 code; empty keeps the existing currency
+// (or, on create, lets the repository use the organization's default).
 func setCurrency(asset *domain.Asset, requested string) bool {
 	if requested == "" {
 		return true
 	}
-	code := strings.ToUpper(strings.TrimSpace(requested))
-	if !currencyPattern.MatchString(code) {
+	code, ok := normalizeCurrency(requested)
+	if !ok {
 		return false
 	}
 	asset.Currency = code

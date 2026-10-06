@@ -30,6 +30,11 @@ type OrganizationFeatures struct {
 	Plugins     bool `json:"plugins"`
 }
 
+// OrganizationSettings holds organization-wide preferences.
+type OrganizationSettings struct {
+	DefaultCurrency string `json:"default_currency"` // ISO 4217 code preselected for new assets
+}
+
 // UserRole represents the user's role in the system
 type UserRole string
 
@@ -168,9 +173,6 @@ type Collection struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 	AssetCount     int       `json:"asset_count"`
 }
-
-// DefaultCurrency is used for assets created without an explicit currency
-const DefaultCurrency = "USD"
 
 // Asset represents a tracked item
 type Asset struct {

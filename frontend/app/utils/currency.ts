@@ -27,8 +27,8 @@ export function sumPurchaseValues(assets: Pick<Asset, 'purchase_price' | 'quanti
 
 // One formatted value per currency, rendered as separate items so they wrap cleanly.
 // Currencies are listed side by side, never converted; add exchange rates if one grand total is needed.
-export function formatPurchaseValues(values: Record<string, number>) {
+export function formatPurchaseValues(values: Record<string, number>, fallbackCurrency = DEFAULT_CURRENCY) {
   const entries = Object.entries(values).sort(([a], [b]) => a.localeCompare(b))
-  if (!entries.length) return [formatMoney(0, DEFAULT_CURRENCY, 0)]
+  if (!entries.length) return [formatMoney(0, fallbackCurrency, 0)]
   return entries.map(([currency, value]) => formatMoney(value, currency, 0))
 }

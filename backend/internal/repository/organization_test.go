@@ -71,6 +71,42 @@ func Test_OrganizationRepository_Create_DefaultsAllFeaturesEnabled(t *testing.T)
 	}
 }
 
+func Test_OrganizationRepository_DefaultCurrency_AppliesToNewAssets(t *testing.T) {
+	ctx := context.Background()
+	if err := testDB.TruncateAll(ctx); err != nil {
+		t.Fatalf("failed to truncate: %v", err)
+	}
+	repo := NewOrganizationRepository(testDB.Pool)
+	org := &domain.Organization{Name: "Default currency"}
+	if err := repo.Create(ctx, org); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := repo.GetSettings(ctx, org.ID); err != nil || got.DefaultCurrency != "USD" {
+		t.Fatalf("expected USD by default, got %+v (err %v)", got, err)
+	}
+	if err := repo.UpdateSettings(ctx, org.ID, &domain.OrganizationSettings{DefaultCurrency: "GBP"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := repo.GetSettings(ctx, org.ID); err != nil || got.DefaultCurrency != "GBP" {
+		t.Fatalf("expected GBP after update, got %+v (err %v)", got, err)
+	}
+
+	assets := NewAssetRepository(testDB.Pool)
+	implicit := &domain.Asset{OrganizationID: org.ID, Name: "No currency given", Quantity: 1}
+	explicit := &domain.Asset{OrganizationID: org.ID, Name: "Bought in euros", Quantity: 1, Currency: "EUR"}
+	for _, a := range []*domain.Asset{implicit, explicit} {
+		if err := assets.Create(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if implicit.Currency != "GBP" || explicit.Currency != "EUR" {
+		t.Fatalf("expected GBP and EUR, got %q and %q", implicit.Currency, explicit.Currency)
+	}
+	if fetched, _ := assets.GetByID(ctx, implicit.ID); fetched == nil || fetched.Currency != "GBP" {
+		t.Fatalf("expected stored currency GBP, got %+v", fetched)
+	}
+}
+
 func Test_OrganizationRepository_UpdateFeatures_ReplacesCompleteMap(t *testing.T) {
 	ctx := context.Background()
 	if err := testDB.TruncateAll(ctx); err != nil {

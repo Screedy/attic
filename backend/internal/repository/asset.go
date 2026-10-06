@@ -326,8 +326,9 @@ func (r *AssetRepository) Create(ctx context.Context, a *domain.Asset) error {
 		INSERT INTO assets (id, organization_id, category_id, location_id, condition_id, collection_id,
 		                    name, description, quantity, attributes, purchase_at, purchase_price, purchase_note, notes,
 		                    import_plugin_id, import_external_id, currency)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-		RETURNING created_at, updated_at
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+		        COALESCE(NULLIF($17, ''), (SELECT default_currency FROM organizations WHERE id = $2)))
+		RETURNING created_at, updated_at, currency
 	`
 	if a.ID == uuid.Nil {
 		a.ID = uuid.New()
@@ -335,14 +336,11 @@ func (r *AssetRepository) Create(ctx context.Context, a *domain.Asset) error {
 	if a.Attributes == nil {
 		a.Attributes = []byte("{}")
 	}
-	if a.Currency == "" {
-		a.Currency = domain.DefaultCurrency
-	}
 	if err := tx.QueryRow(ctx, query,
 		a.ID, a.OrganizationID, a.CategoryID, a.LocationID, a.ConditionID, a.CollectionID,
 		a.Name, a.Description, a.Quantity, a.Attributes, a.PurchaseAt, a.PurchasePrice, a.PurchaseNote, a.Notes,
 		a.ImportPluginID, a.ImportExternalID, a.Currency,
-	).Scan(&a.CreatedAt, &a.UpdatedAt); err != nil {
+	).Scan(&a.CreatedAt, &a.UpdatedAt, &a.Currency); err != nil {
 		return err
 	}
 	if a.CollectionIDs == nil {

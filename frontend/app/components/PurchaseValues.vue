@@ -1,9 +1,10 @@
 <script setup lang="ts">
 const props = defineProps<{ values: Record<string, number> }>()
+const { settings } = useOrganizationSettings()
 
 const VISIBLE = 3
 const expanded = ref(false)
-const formatted = computed(() => formatPurchaseValues(props.values))
+const formatted = computed(() => formatPurchaseValues(props.values, settings.value.default_currency))
 const shown = computed(() => expanded.value ? formatted.value : formatted.value.slice(0, VISIBLE))
 </script>
 

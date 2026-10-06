@@ -17,6 +17,10 @@ export interface OrganizationFeatures {
   plugins: boolean
 }
 
+export interface OrganizationSettings {
+  default_currency: string // ISO 4217 code preselected for new assets
+}
+
 export type AttributeDataType = 'string' | 'number' | 'boolean' | 'text' | 'date' | 'select'
 
 export interface AttributeOptionInput {

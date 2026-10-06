@@ -56,6 +56,37 @@ func (h *Handler) UpdateOrganizationFeatures(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, features)
 }
 
+// GetOrganizationSettings returns organization-wide preferences. Like the
+// feature switches, reading them is available to all users.
+func (h *Handler) GetOrganizationSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.repos.Organizations.GetSettings(r.Context(), h.orgID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get organization settings")
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
+// UpdateOrganizationSettings replaces organization-wide preferences.
+func (h *Handler) UpdateOrganizationSettings(w http.ResponseWriter, r *http.Request) {
+	var req domain.OrganizationSettings
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	currency, ok := normalizeCurrency(req.DefaultCurrency)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "default_currency must be a 3-letter ISO 4217 code")
+		return
+	}
+	settings := &domain.OrganizationSettings{DefaultCurrency: currency}
+	if err := h.repos.Organizations.UpdateSettings(r.Context(), h.orgID, settings); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update organization settings")
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
 func decodeMap(raw map[string]any, target any) error {
 	// Reuse the same JSON semantics as request decoding without accepting
 	// unknown fields a second time.

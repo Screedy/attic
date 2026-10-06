@@ -18,6 +18,7 @@ describe('purchase values', () => {
 
   it('shows zero in the default currency when nothing is priced', () => {
     expect(formatPurchaseValues({})).toEqual(['$0'])
+    expect(formatPurchaseValues({}, 'GBP')).toEqual(['£0'])
   })
 
   it('offers CZK, EUR and USD', () => {

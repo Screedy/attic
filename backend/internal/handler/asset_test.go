@@ -373,7 +373,7 @@ func createTestAsset(name string, categoryID uuid.UUID, price *float64) *domain.
 		Name:           name,
 		Quantity:       1,
 		PurchasePrice:  price,
-		Currency:       domain.DefaultCurrency,
+		Currency:       "USD",
 		CreatedAt:      time.Now().UTC(),
 		UpdatedAt:      time.Now().UTC(),
 	}

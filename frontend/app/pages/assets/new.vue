@@ -12,6 +12,7 @@ const route = useRoute()
 const toast = useToast()
 const apiFetch = useApiFetch()
 const { features } = useFeatures()
+const { settings } = useOrganizationSettings()
 
 const { data: categories } = useApi<Category[]>('/api/categories', { immediate: features.value.categories })
 const { data: locations } = useApi<Location[]>('/api/locations', { immediate: features.value.locations })
@@ -33,7 +34,7 @@ const form = reactive({
   attributes: {} as Record<string, string | number | boolean | string[] | undefined>,
   purchase_at: '',
   purchase_price: undefined as number | undefined,
-  currency: DEFAULT_CURRENCY,
+  currency: settings.value.default_currency,
   purchase_note: '',
   notes: ''
 })
@@ -43,6 +44,12 @@ watch(() => route.query.location_id, (locationId) => {
     form.location_id = locationId
   }
 }, { immediate: true })
+
+// Opened directly, the organization default may load after the form is created:
+// follow it until the user picks a currency themselves.
+watch(() => settings.value.default_currency, (next, previous) => {
+  if (form.currency === previous) form.currency = next
+})
 
 interface LocationOption {
   label: string
