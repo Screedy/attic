@@ -21,6 +21,8 @@ tags:
     description: Asset condition management
   - name: Assets
     description: Asset management
+  - name: Organization
+    description: Organization-wide settings
   - name: Tags
     description: Shared asset tag management
   - name: Asset Events
@@ -72,6 +74,48 @@ paths:
                 $ref: '#/components/schemas/User'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /api/organization/settings:
+    get:
+      tags: [Organization]
+      summary: Get organization settings
+      description: Available to every signed-in user.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Current organization settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Organization]
+      summary: Update organization settings
+      description: Admin only. Changing the default currency does not change the currency of existing assets.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationSettings'
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationSettings'
+        '400':
+          description: default_currency is missing or not a 3-letter ISO 4217 code
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Admin access required
 
   /api/categories:
     get:
@@ -596,6 +640,34 @@ paths:
                 $ref: '#/components/schemas/FilterError'
         '401':
           description: Authentication required
+
+  /api/assets/stats:
+    get:
+      tags: [Assets]
+      summary: Get total purchase value
+      description: Sums purchase price * quantity of all assets per currency. Currencies are never converted or added together, and assets without a purchase price are skipped.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: location_id
+          in: query
+          description: Only count assets stored directly in this location; sub-locations are not included. Requires the Locations feature.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Purchase value per currency
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetStats'
+        '400':
+          description: location_id is not a valid UUID
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: location_id was given but the Locations feature is disabled
 
   /api/saved-filters:
     get:
@@ -1871,6 +1943,11 @@ components:
         attributes:
           type: object
           additionalProperties: true
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217 code of the purchase price. Always present.
+          example: CZK
         category:
           $ref: '#/components/schemas/Category'
         location:
@@ -1927,6 +2004,11 @@ components:
         attributes:
           type: object
           additionalProperties: true
+        currency:
+          type: string
+          description: >-
+            ISO 4217 code of the purchase price. Trimmed and uppercased, so " eur " is stored as EUR.
+          example: EUR
 
     AssetList:
       type: object
@@ -1941,6 +2023,35 @@ components:
           type: integer
         offset:
           type: integer
+
+    AssetStats:
+      type: object
+      required: [purchase_values]
+      properties:
+        purchase_values:
+          type: object
+          description: Purchase value (price * quantity) per ISO 4217 currency code. Empty when no asset has a purchase price.
+          additionalProperties:
+            type: number
+          example: { CZK: 56830, EUR: 2677, USD: 3394 }
+        total_value:
+          type: number
+          deprecated: true
+          description: >-
+            Use purchase_values. 0 when no asset has a purchase price, and the sum when all priced assets
+            share one currency. Omitted once more than one currency is used, because adding different
+            currencies together would give a wrong number.
+
+    OrganizationSettings:
+      type: object
+      required: [default_currency]
+      properties:
+        default_currency:
+          type: string
+          description: >-
+            ISO 4217 code preselected for new assets, and used when an asset is created without a currency.
+            Trimmed and uppercased on save.
+          example: GBP
 
     Warranty:
       type: object
