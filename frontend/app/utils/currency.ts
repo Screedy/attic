@@ -1,5 +1,3 @@
-import type { Asset } from '~/types/api'
-
 export const DEFAULT_CURRENCY = 'USD'
 
 // Every ISO 4217 code the runtime knows; curate a shortlist if the long menu gets in the way.
@@ -12,17 +10,6 @@ export function formatMoney(value: number, currency = DEFAULT_CURRENCY, fraction
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits
   }).format(value)
-}
-
-// Purchase price * quantity, summed per currency.
-export function sumPurchaseValues(assets: Pick<Asset, 'purchase_price' | 'quantity' | 'currency'>[]) {
-  const values: Record<string, number> = {}
-  for (const asset of assets) {
-    if (asset.purchase_price == null) continue
-    const currency = asset.currency || DEFAULT_CURRENCY
-    values[currency] = (values[currency] || 0) + asset.purchase_price * asset.quantity
-  }
-  return values
 }
 
 // One formatted value per currency, rendered as separate items so they wrap cleanly.

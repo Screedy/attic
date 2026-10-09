@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Location, Asset } from '~/types/api'
+import type { Location, Asset, AssetStats } from '~/types/api'
 import { getLocationNameError } from '~/utils/locationValidation'
 
 definePageMeta({
@@ -27,10 +27,22 @@ const { data: locationAssets, refresh: refreshAssets } = useApi<{ assets: Asset[
   { immediate: false, watch: false }
 )
 
+// Purchase value of every asset in the location (not just the loaded page), per currency
+const locationStatsUrl = computed(() =>
+  selectedLocation.value ? `/api/assets/stats?location_id=${selectedLocation.value.id}` : ''
+)
+const { data: locationStats, refresh: refreshLocationStats } = useApi<AssetStats>(
+  () => locationStatsUrl.value,
+  // Own key: with function URLs that start out empty, useApi calls would otherwise share
+  // one auto-generated key, and this refresh would re-run the assets request instead.
+  { key: 'location-purchase-values', immediate: false, watch: false }
+)
+
 // Watch selected location to fetch assets
 watch(selectedLocation, (loc) => {
   if (loc) {
     refreshAssets()
+    refreshLocationStats()
   }
 })
 
@@ -293,9 +305,6 @@ watch(searchQuery, (query) => {
 function hasChildren(locationId: string): boolean {
   return locations.value?.some(l => l.parent_id === locationId) || false
 }
-
-// Purchase value of assets in location, per currency
-const locationPurchaseValues = computed(() => sumPurchaseValues(locationAssets.value?.assets || []))
 
 // Get icon for location based on explicit icon or fallback by name
 function getLocationIcon(location: Location): string {
@@ -569,7 +578,7 @@ function getLocationIcon(location: Location): string {
                         </p>
                         <PurchaseValues
                           :key="selectedLocation.id"
-                          :values="locationPurchaseValues"
+                          :values="locationStats?.purchase_values || {}"
                           class="text-2xl font-black text-white"
                         />
                       </div>
