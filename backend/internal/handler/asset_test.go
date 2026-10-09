@@ -903,6 +903,8 @@ func Test_ApplyPurchase_Currency(t *testing.T) {
 		{"US", "EUR", false},
 		{"EURO", "EUR", false},
 		{"12$", "EUR", false},
+		{"ZZZ", "EUR", false}, // well-formed but not a real currency
+		{"dem", "DEM", true},  // historical currencies are accepted
 	}
 	for _, tc := range cases {
 		asset := &domain.Asset{Currency: "EUR"}
@@ -910,7 +912,7 @@ func Test_ApplyPurchase_Currency(t *testing.T) {
 		if (err == nil) != tc.ok || asset.Currency != tc.want {
 			t.Errorf("applyPurchase(currency %q): err %v, currency %q; want ok=%v, %q", tc.requested, err, asset.Currency, tc.ok, tc.want)
 		}
-		if err != nil && err.Error() != "currency must be a 3-letter ISO 4217 code" {
+		if err != nil && err.Error() != "currency must be a known ISO 4217 currency code" {
 			t.Errorf("unexpected error message: %q", err)
 		}
 	}

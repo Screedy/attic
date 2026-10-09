@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lmmendes/attic/internal/domain"
 	"github.com/lmmendes/attic/internal/repository"
+	"golang.org/x/text/currency"
 )
 
 const maxAssetQuantity = 1000000
@@ -622,16 +622,18 @@ func (h *Handler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
-
-const currencyRequirement = "must be a 3-letter ISO 4217 code"
+const currencyRequirement = "must be a known ISO 4217 currency code"
 
 var errInvalidCurrency = errors.New("currency " + currencyRequirement)
 
-// normalizeCurrency trims and uppercases an ISO 4217 code; ok is false unless it is three letters.
+// normalizeCurrency trims and uppercases an ISO 4217 code; ok is false unless it is a known currency.
+// x/text's table lacks a few recent codes (MRU, SLE, VES, XCG, ZWG), so the frontend picker hides them.
 func normalizeCurrency(s string) (string, bool) {
-	code := strings.ToUpper(strings.TrimSpace(s))
-	return code, currencyPattern.MatchString(code)
+	unit, err := currency.ParseISO(strings.TrimSpace(s))
+	if err != nil {
+		return "", false
+	}
+	return unit.String(), true
 }
 
 // applyPurchase copies the purchase fields of a create or update request onto the asset.
