@@ -38,23 +38,8 @@ type CreateAssetRequest struct {
 	Notes         *string         `json:"notes,omitempty"`
 }
 
-type UpdateAssetRequest struct {
-	CollectionIDs []string        `json:"collection_ids,omitempty"`
-	TagIDs        *[]string       `json:"tag_ids,omitempty"`
-	NewTagNames   *[]string       `json:"new_tag_names,omitempty"`
-	CategoryID    *string         `json:"category_id,omitempty"`
-	LocationID    *string         `json:"location_id,omitempty"`
-	ConditionID   *string         `json:"condition_id,omitempty"`
-	Name          string          `json:"name"`
-	Description   *string         `json:"description,omitempty"`
-	Quantity      int             `json:"quantity"`
-	Attributes    json.RawMessage `json:"attributes,omitempty"`
-	PurchaseAt    *string         `json:"purchase_at,omitempty"`
-	PurchasePrice *float64        `json:"purchase_price,omitempty"`
-	Currency      string          `json:"currency,omitempty"`
-	PurchaseNote  *string         `json:"purchase_note,omitempty"`
-	Notes         *string         `json:"notes,omitempty"`
-}
+// UpdateAssetRequest accepts the same fields as CreateAssetRequest (the AssetInput schema).
+type UpdateAssetRequest = CreateAssetRequest
 
 type AssetListResponse struct {
 	Assets []AssetWithImageURL `json:"assets"`
@@ -337,17 +322,10 @@ func (h *Handler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 			asset.ConditionID = &id
 		}
 	}
-	if req.PurchaseAt != nil && *req.PurchaseAt != "" {
-		if t, err := time.Parse("2006-01-02", *req.PurchaseAt); err == nil {
-			asset.PurchaseAt = &t
-		}
-	}
-	asset.PurchasePrice = req.PurchasePrice
-	if !setCurrency(asset, req.Currency) {
-		writeError(w, http.StatusBadRequest, "currency must be a 3-letter ISO 4217 code")
+	if err := applyPurchase(asset, req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	asset.PurchaseNote = req.PurchaseNote
 	asset.Notes = req.Notes
 
 	asset.CollectionIDs = collectionIDs
@@ -498,19 +476,10 @@ func (h *Handler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	} else if features.Conditions {
 		asset.ConditionID = nil
 	}
-	if req.PurchaseAt != nil && *req.PurchaseAt != "" {
-		if t, err := time.Parse("2006-01-02", *req.PurchaseAt); err == nil {
-			asset.PurchaseAt = &t
-		}
-	} else {
-		asset.PurchaseAt = nil
-	}
-	asset.PurchasePrice = req.PurchasePrice
-	if !setCurrency(asset, req.Currency) {
-		writeError(w, http.StatusBadRequest, "currency must be a 3-letter ISO 4217 code")
+	if err := applyPurchase(asset, req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	asset.PurchaseNote = req.PurchaseNote
 	asset.Notes = req.Notes
 	if features.Collections {
 		asset.CollectionIDs = collectionIDs
@@ -655,24 +624,35 @@ func (h *Handler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
+const currencyRequirement = "must be a 3-letter ISO 4217 code"
+
+var errInvalidCurrency = errors.New("currency " + currencyRequirement)
+
 // normalizeCurrency trims and uppercases an ISO 4217 code; ok is false unless it is three letters.
 func normalizeCurrency(s string) (string, bool) {
 	code := strings.ToUpper(strings.TrimSpace(s))
 	return code, currencyPattern.MatchString(code)
 }
 
-// setCurrency applies a requested ISO 4217 code; empty keeps the existing currency
-// (or, on create, lets the repository use the organization's default).
-func setCurrency(asset *domain.Asset, requested string) bool {
-	if requested == "" {
-		return true
+// applyPurchase copies the purchase fields of a create or update request onto the asset.
+// An empty purchase_at clears the date and an unparsable one is ignored; an empty currency
+// keeps the current one (on create, the repository then uses the organization's default).
+func applyPurchase(asset *domain.Asset, req CreateAssetRequest) error {
+	if req.PurchaseAt == nil || *req.PurchaseAt == "" {
+		asset.PurchaseAt = nil
+	} else if t, err := time.Parse("2006-01-02", *req.PurchaseAt); err == nil {
+		asset.PurchaseAt = &t
 	}
-	code, ok := normalizeCurrency(requested)
-	if !ok {
-		return false
+	asset.PurchasePrice = req.PurchasePrice
+	if req.Currency != "" {
+		code, ok := normalizeCurrency(req.Currency)
+		if !ok {
+			return errInvalidCurrency
+		}
+		asset.Currency = code
 	}
-	asset.Currency = code
-	return true
+	asset.PurchaseNote = req.PurchaseNote
+	return nil
 }
 
 func parseUUIDString(s string) (uuid.UUID, error) {

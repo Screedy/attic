@@ -891,13 +891,13 @@ func Test_GetAssetStats_FiltersByLocation(t *testing.T) {
 	}
 }
 
-func Test_SetCurrency(t *testing.T) {
+func Test_ApplyPurchase_Currency(t *testing.T) {
 	cases := []struct {
 		requested string
 		want      string
 		ok        bool
 	}{
-		{"", "EUR", true},
+		{"", "EUR", true}, // empty keeps existing
 		{" czk ", "CZK", true},
 		{"usd", "USD", true},
 		{"US", "EUR", false},
@@ -906,8 +906,38 @@ func Test_SetCurrency(t *testing.T) {
 	}
 	for _, tc := range cases {
 		asset := &domain.Asset{Currency: "EUR"}
-		if ok := setCurrency(asset, tc.requested); ok != tc.ok || asset.Currency != tc.want {
-			t.Errorf("setCurrency(%q) = %v, currency %q; want %v, %q", tc.requested, ok, asset.Currency, tc.ok, tc.want)
+		err := applyPurchase(asset, CreateAssetRequest{Currency: tc.requested})
+		if (err == nil) != tc.ok || asset.Currency != tc.want {
+			t.Errorf("applyPurchase(currency %q): err %v, currency %q; want ok=%v, %q", tc.requested, err, asset.Currency, tc.ok, tc.want)
+		}
+		if err != nil && err.Error() != "currency must be a 3-letter ISO 4217 code" {
+			t.Errorf("unexpected error message: %q", err)
+		}
+	}
+}
+
+func Test_ApplyPurchase_PurchaseDate(t *testing.T) {
+	existing := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
+	valid := time.Date(2024, 3, 12, 0, 0, 0, 0, time.UTC)
+	str := func(s string) *string { return &s }
+	cases := []struct {
+		name string
+		at   *string
+		want *time.Time
+	}{
+		{"omitted clears the date", nil, nil},
+		{"empty clears the date", str(""), nil},
+		{"invalid keeps the existing date", str("not-a-date"), &existing},
+		{"valid date is set", str("2024-03-12"), &valid},
+	}
+	for _, tc := range cases {
+		at := existing
+		asset := &domain.Asset{PurchaseAt: &at}
+		if err := applyPurchase(asset, CreateAssetRequest{PurchaseAt: tc.at}); err != nil {
+			t.Fatalf("%s: unexpected error %v", tc.name, err)
+		}
+		if (asset.PurchaseAt == nil) != (tc.want == nil) || (tc.want != nil && !asset.PurchaseAt.Equal(*tc.want)) {
+			t.Errorf("%s: got %v, want %v", tc.name, asset.PurchaseAt, tc.want)
 		}
 	}
 }

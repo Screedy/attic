@@ -79,11 +79,9 @@ async function save() {
               Preselected when adding a new asset. Existing assets keep their currency.
             </p>
           </div>
-          <USelectMenu
+          <CurrencySelect
             v-model="settings.default_currency"
             aria-label="Default currency"
-            :items="currencies"
-            class="w-28 shrink-0"
           />
         </div>
       </div>

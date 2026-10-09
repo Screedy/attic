@@ -76,7 +76,7 @@ func (h *Handler) UpdateOrganizationSettings(w http.ResponseWriter, r *http.Requ
 	}
 	currency, ok := normalizeCurrency(req.DefaultCurrency)
 	if !ok {
-		writeError(w, http.StatusBadRequest, "default_currency must be a 3-letter ISO 4217 code")
+		writeError(w, http.StatusBadRequest, "default_currency "+currencyRequirement)
 		return
 	}
 	settings := &domain.OrganizationSettings{DefaultCurrency: currency}

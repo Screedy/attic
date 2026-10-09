@@ -695,11 +695,9 @@ async function submitForm() {
                     placeholder="0.00"
                     class="block w-full min-w-0 flex-1 rounded-xl border-mist-200 bg-white py-3 px-4 text-sm text-mist-950 shadow-sm placeholder:text-dimmed focus:border-attic-500 focus:ring-attic-500 dark:border-mist-600 dark:bg-mist-800 dark:text-white"
                   >
-                  <USelectMenu
+                  <CurrencySelect
                     v-model="form.currency"
                     aria-label="Currency"
-                    :items="currencies"
-                    class="w-28 shrink-0"
                     size="lg"
                   />
                 </div>
