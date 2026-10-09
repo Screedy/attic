@@ -20,5 +20,11 @@ export function useOrganizationSettings() {
     return settings.value
   }
 
-  return { settings, load, update }
+  // Called on logout, so a failed load after the next login (possibly against another
+  // instance on the same address) never reuses the previous instance's default.
+  const reset = () => {
+    settings.value = { default_currency: DEFAULT_CURRENCY }
+  }
+
+  return { settings, load, update, reset }
 }

@@ -25,7 +25,7 @@ useSeoMeta({
 
 const { isAuthenticated: loggedIn, user, isAdmin, logout, fetchSession, isAuthDisabled, isOIDCEnabled, changePassword } = useAuth()
 const { features, loaded: featuresLoaded, error: featureError, load: loadFeatures } = useFeatures()
-const { load: loadOrganizationSettings } = useOrganizationSettings()
+const { load: loadOrganizationSettings, reset: resetOrganizationSettings } = useOrganizationSettings()
 const config = useRuntimeConfig()
 const { data: savedSearches, refresh: refreshSavedSearches } = useApi<SavedFilter[]>('/api/saved-filters', {
   immediate: false
@@ -54,6 +54,7 @@ watch(loggedIn, (isLoggedIn) => {
     void loadOrganizationSettings()
     void refreshSavedSearches()
   } else {
+    resetOrganizationSettings()
     savedSearches.value = []
   }
 }, { immediate: true })
