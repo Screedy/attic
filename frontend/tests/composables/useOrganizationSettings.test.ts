@@ -19,19 +19,19 @@ async function mountSettingsConsumer() {
 }
 
 describe('organization settings', () => {
-  it('loads the default, keeps it when a reload fails, and resets it on logout', async () => {
+  it('loads the currency, keeps it when a reload fails, and resets it on logout', async () => {
     const { result, wrapper } = await mountSettingsConsumer()
 
-    apiFetch.mockResolvedValueOnce({ default_currency: 'GBP' })
+    apiFetch.mockResolvedValueOnce({ currency: 'GBP' })
     await result.load()
-    expect(result.settings.value.default_currency).toBe('GBP')
+    expect(result.settings.value.currency).toBe('GBP')
 
     apiFetch.mockRejectedValueOnce(new Error('offline'))
     await result.load()
-    expect(result.settings.value.default_currency).toBe('GBP')
+    expect(result.settings.value.currency).toBe('GBP')
 
     result.reset()
-    expect(result.settings.value.default_currency).toBe('USD')
+    expect(result.settings.value.currency).toBe('USD')
     wrapper.unmount()
   })
 })

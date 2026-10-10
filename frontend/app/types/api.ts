@@ -18,7 +18,7 @@ export interface OrganizationFeatures {
 }
 
 export interface OrganizationSettings {
-  default_currency: string // ISO 4217 code preselected for new assets
+  currency: string // ISO 4217 code of every asset price; amounts are never converted
 }
 
 export type AttributeDataType = 'string' | 'number' | 'boolean' | 'text' | 'date' | 'select'
@@ -137,7 +137,6 @@ export interface Asset {
   attributes?: Record<string, unknown>
   purchase_at?: string
   purchase_price?: number
-  currency?: string
   purchase_note?: string
   notes?: string
   category?: Category
@@ -150,7 +149,7 @@ export interface Asset {
 }
 
 export interface AssetStats {
-  purchase_values: Record<string, number> // Purchase value (price * quantity) per currency code
+  total_value: number
 }
 
 export interface Warranty {

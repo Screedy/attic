@@ -47,7 +47,7 @@ async function save() {
         Settings
       </h1>
       <p class="text-muted mt-2">
-        Choose which inventory features are available to your organization and set its defaults.
+        Choose which inventory features are available to your organization and set its currency.
       </p>
     </div>
     <UCard>
@@ -73,15 +73,17 @@ async function save() {
         <div class="py-5 flex items-center justify-between gap-6">
           <div>
             <p class="font-bold text-mist-950 dark:text-white">
-              Default currency
+              Currency
             </p>
             <p class="text-sm text-muted mt-1">
-              Preselected when adding a new asset. Existing assets keep their currency.
+              Used for all asset prices. Changing it relabels existing prices; amounts are not converted.
             </p>
           </div>
-          <CurrencySelect
-            v-model="settings.default_currency"
-            aria-label="Default currency"
+          <USelectMenu
+            v-model="settings.currency"
+            aria-label="Currency"
+            :items="currencies"
+            class="w-28 shrink-0"
           />
         </div>
       </div>

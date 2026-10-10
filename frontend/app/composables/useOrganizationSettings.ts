@@ -1,14 +1,14 @@
 import type { OrganizationSettings } from '~/types/api'
 
-// Organization-wide preferences, loaded once after login (see app.vue).
+// Organization-wide preferences (the currency of every asset price), loaded once after login (see app.vue).
 export function useOrganizationSettings() {
-  const settings = useState<OrganizationSettings>('organization-settings', () => ({ default_currency: DEFAULT_CURRENCY }))
+  const settings = useState<OrganizationSettings>('organization-settings', () => ({ currency: DEFAULT_CURRENCY }))
 
   const load = async () => {
     try {
       settings.value = await useApiFetch()<OrganizationSettings>('/api/organization/settings')
     } catch {
-      // Keep the current value: forms still work with the fallback currency.
+      // Keep the current value: prices still render with the fallback currency.
     }
   }
 
@@ -21,9 +21,9 @@ export function useOrganizationSettings() {
   }
 
   // Called on logout, so a failed load after the next login (possibly against another
-  // instance on the same address) never reuses the previous instance's default.
+  // instance on the same address) never reuses the previous instance's currency.
   const reset = () => {
-    settings.value = { default_currency: DEFAULT_CURRENCY }
+    settings.value = { currency: DEFAULT_CURRENCY }
   }
 
   return { settings, load, update, reset }

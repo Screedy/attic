@@ -109,17 +109,17 @@ func (r *mockAssetRepo) SetTags(_ context.Context, _ uuid.UUID, _ []uuid.UUID) e
 	return nil
 }
 
-func (r *mockAssetRepo) GetPurchaseValues(_ context.Context, _ uuid.UUID, filter domain.AssetFilter) (map[string]float64, error) {
-	values := map[string]float64{}
+func (r *mockAssetRepo) GetTotalValue(_ context.Context, _ uuid.UUID, filter domain.AssetFilter) (float64, error) {
+	var total float64
 	for _, a := range r.assets {
 		if filter.LocationID != nil && (a.LocationID == nil || *a.LocationID != *filter.LocationID) {
 			continue
 		}
 		if a.PurchasePrice != nil {
-			values[a.Currency] += *a.PurchasePrice * float64(a.Quantity)
+			total += *a.PurchasePrice * float64(a.Quantity)
 		}
 	}
-	return values, nil
+	return total, nil
 }
 
 // testAssetHandler wraps asset handler logic for testing
@@ -343,13 +343,15 @@ func (h *testAssetHandler) getAssetStats(w http.ResponseWriter, r *http.Request)
 		filter.LocationID = &id
 	}
 
-	purchaseValues, err := h.assetRepo.GetPurchaseValues(r.Context(), h.orgID, filter)
+	totalValue, err := h.assetRepo.GetTotalValue(r.Context(), h.orgID, filter)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get asset stats")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newAssetStatsResponse(purchaseValues))
+	writeJSON(w, http.StatusOK, AssetStatsResponse{
+		TotalValue: totalValue,
+	})
 }
 
 func parseInt(s string) (int, error) {
@@ -373,7 +375,6 @@ func createTestAsset(name string, categoryID uuid.UUID, price *float64) *domain.
 		Name:           name,
 		Quantity:       1,
 		PurchasePrice:  price,
-		Currency:       "USD",
 		CreatedAt:      time.Now().UTC(),
 		UpdatedAt:      time.Now().UTC(),
 	}
@@ -803,10 +804,6 @@ func Test_GetAssetStats_ReturnsCorrectTotalValue(t *testing.T) {
 	h.assetRepo.addAsset(createTestAsset("Asset 2", catID, &price2))
 	h.assetRepo.addAsset(createTestAsset("Asset 3", catID, &price3))
 	h.assetRepo.addAsset(createTestAsset("Asset without price", catID, nil))
-	euroAsset := createTestAsset("Euro asset", catID, &price1)
-	euroAsset.Currency = "EUR"
-	euroAsset.Quantity = 2
-	h.assetRepo.addAsset(euroAsset)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/assets/stats", nil)
 	rec := httptest.NewRecorder()
@@ -819,17 +816,9 @@ func Test_GetAssetStats_ReturnsCorrectTotalValue(t *testing.T) {
 	var resp AssetStatsResponse
 	json.NewDecoder(rec.Body).Decode(&resp)
 
-	if len(resp.PurchaseValues) != 2 {
-		t.Errorf("expected purchase values for 2 currencies, got %v", resp.PurchaseValues)
-	}
-	if expected := price1 + price2 + price3; resp.PurchaseValues["USD"] != expected {
-		t.Errorf("expected USD purchase value %.2f, got %.2f", expected, resp.PurchaseValues["USD"])
-	}
-	if expected := price1 * 2; resp.PurchaseValues["EUR"] != expected {
-		t.Errorf("expected EUR purchase value %.2f, got %.2f", expected, resp.PurchaseValues["EUR"])
-	}
-	if resp.TotalValue != nil {
-		t.Errorf("expected total_value to be omitted for mixed currencies, got %.2f", *resp.TotalValue)
+	expectedTotal := price1 + price2 + price3
+	if resp.TotalValue != expectedTotal {
+		t.Errorf("expected total value %.2f, got %.2f", expectedTotal, resp.TotalValue)
 	}
 }
 
@@ -847,11 +836,8 @@ func Test_GetAssetStats_NoAssets_ReturnsZero(t *testing.T) {
 	var resp AssetStatsResponse
 	json.NewDecoder(rec.Body).Decode(&resp)
 
-	if resp.PurchaseValues == nil || len(resp.PurchaseValues) != 0 {
-		t.Errorf("expected empty purchase_values object, got %v", resp.PurchaseValues)
-	}
-	if resp.TotalValue == nil || *resp.TotalValue != 0 {
-		t.Errorf("expected total_value 0, got %v", resp.TotalValue)
+	if resp.TotalValue != 0 {
+		t.Errorf("expected total value 0, got %.2f", resp.TotalValue)
 	}
 }
 
@@ -883,64 +869,8 @@ func Test_GetAssetStats_FiltersByLocation(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if len(resp.PurchaseValues) != 1 || resp.PurchaseValues["USD"] != selectedPrice {
-		t.Errorf("expected USD purchase value %.2f only, got %v", selectedPrice, resp.PurchaseValues)
-	}
-	if resp.TotalValue == nil || *resp.TotalValue != selectedPrice {
-		t.Errorf("expected total_value %.2f for a single currency, got %v", selectedPrice, resp.TotalValue)
-	}
-}
-
-func Test_ApplyPurchase_Currency(t *testing.T) {
-	cases := []struct {
-		requested string
-		want      string
-		ok        bool
-	}{
-		{"", "EUR", true}, // empty keeps existing
-		{" czk ", "CZK", true},
-		{"usd", "USD", true},
-		{"US", "EUR", false},
-		{"EURO", "EUR", false},
-		{"12$", "EUR", false},
-		{"ZZZ", "EUR", false}, // well-formed but not a real currency
-		{"dem", "DEM", true},  // historical currencies are accepted
-	}
-	for _, tc := range cases {
-		asset := &domain.Asset{Currency: "EUR"}
-		err := applyPurchase(asset, CreateAssetRequest{Currency: tc.requested})
-		if (err == nil) != tc.ok || asset.Currency != tc.want {
-			t.Errorf("applyPurchase(currency %q): err %v, currency %q; want ok=%v, %q", tc.requested, err, asset.Currency, tc.ok, tc.want)
-		}
-		if err != nil && err.Error() != "currency must be a known ISO 4217 currency code" {
-			t.Errorf("unexpected error message: %q", err)
-		}
-	}
-}
-
-func Test_ApplyPurchase_PurchaseDate(t *testing.T) {
-	existing := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
-	valid := time.Date(2024, 3, 12, 0, 0, 0, 0, time.UTC)
-	str := func(s string) *string { return &s }
-	cases := []struct {
-		name string
-		at   *string
-		want *time.Time
-	}{
-		{"omitted clears the date", nil, nil},
-		{"empty clears the date", str(""), nil},
-		{"invalid keeps the existing date", str("not-a-date"), &existing},
-		{"valid date is set", str("2024-03-12"), &valid},
-	}
-	for _, tc := range cases {
-		at := existing
-		asset := &domain.Asset{PurchaseAt: &at}
-		if err := applyPurchase(asset, CreateAssetRequest{PurchaseAt: tc.at}); err != nil {
-			t.Fatalf("%s: unexpected error %v", tc.name, err)
-		}
-		if (asset.PurchaseAt == nil) != (tc.want == nil) || (tc.want != nil && !asset.PurchaseAt.Equal(*tc.want)) {
-			t.Errorf("%s: got %v, want %v", tc.name, asset.PurchaseAt, tc.want)
-		}
+	if resp.TotalValue != selectedPrice {
+		t.Errorf("expected total value %.2f, got %.2f", selectedPrice, resp.TotalValue)
 	}
 }
 

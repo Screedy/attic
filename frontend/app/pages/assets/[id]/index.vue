@@ -10,6 +10,7 @@ const router = useRouter()
 const toast = useToast()
 const apiFetch = useApiFetch()
 const { features } = useFeatures()
+const { settings } = useOrganizationSettings()
 
 const assetUrl = computed(() => `/api/assets/${route.params.id}`)
 const { data: asset, refresh: refreshAsset } = useApi<Asset>(
@@ -271,9 +272,12 @@ function formatBytes(bytes: number) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
-function formatCurrency(value?: number, currency?: string) {
+function formatCurrency(value?: number) {
   if (value === undefined || value === null) return '-'
-  return formatMoney(value, currency)
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: settings.value.currency
+  }).format(value)
 }
 
 function daysUntilExpiry(endDate?: string) {
@@ -586,7 +590,7 @@ function getShortId(): string {
               </div>
               <div class="flex items-center justify-between p-4 transition-colors hover:bg-mist-50 dark:hover:bg-mist-700/50">
                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Purchase Price</span>
-                <span class="text-sm font-bold text-mist-950 dark:text-white">{{ formatCurrency(asset.purchase_price, asset.currency) }}</span>
+                <span class="text-sm font-bold text-mist-950 dark:text-white">{{ formatCurrency(asset.purchase_price) }}</span>
               </div>
               <div class="flex items-center justify-between p-4 transition-colors hover:bg-mist-50 dark:hover:bg-mist-700/50">
                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Created</span>

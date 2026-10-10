@@ -3,8 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/lmmendes/attic/internal/domain"
+	"golang.org/x/text/currency"
 )
 
 // GetOrganizationFeatures returns the effective feature switches for the
@@ -67,19 +69,22 @@ func (h *Handler) GetOrganizationSettings(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, settings)
 }
 
-// UpdateOrganizationSettings replaces organization-wide preferences.
+// UpdateOrganizationSettings replaces organization-wide preferences. Changing the
+// currency relabels all existing asset prices; amounts are never converted.
 func (h *Handler) UpdateOrganizationSettings(w http.ResponseWriter, r *http.Request) {
 	var req domain.OrganizationSettings
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	currency, ok := normalizeCurrency(req.DefaultCurrency)
-	if !ok {
-		writeError(w, http.StatusBadRequest, "default_currency "+currencyRequirement)
+	// Historical codes (e.g. DEM) are accepted; x/text's table lacks a few recent ones
+	// (MRU, SLE, VES, XCG, ZWG), so the frontend picker hides those.
+	unit, err := currency.ParseISO(strings.TrimSpace(req.Currency))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "currency must be a known ISO 4217 currency code")
 		return
 	}
-	settings := &domain.OrganizationSettings{DefaultCurrency: currency}
+	settings := &domain.OrganizationSettings{Currency: unit.String()}
 	if err := h.repos.Organizations.UpdateSettings(r.Context(), h.orgID, settings); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update organization settings")
 		return

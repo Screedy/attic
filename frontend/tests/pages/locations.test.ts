@@ -496,6 +496,37 @@ describe('Locations Page', () => {
     })
   })
 
+  describe('currency formatting', () => {
+    it('formats currency values', () => {
+      const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(value)
+      }
+
+      expect(formatCurrency(1000)).toBe('$1,000')
+      expect(formatCurrency(0)).toBe('$0')
+      expect(formatCurrency(1234567)).toBe('$1,234,567')
+    })
+  })
+
+  describe('total value calculation', () => {
+    it('calculates total value of assets', () => {
+      const assets = [
+        { id: '1', name: 'Asset 1', purchase_price: 100 },
+        { id: '2', name: 'Asset 2', purchase_price: 250 },
+        { id: '3', name: 'Asset 3', purchase_price: undefined }
+      ]
+
+      const totalValue = assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0)
+
+      expect(totalValue).toBe(350)
+    })
+  })
+
   describe('children lookup', () => {
     it('gets children of a location', () => {
       const locations: Location[] = [

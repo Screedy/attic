@@ -58,14 +58,14 @@ func (m *mockOrganizationFeatureRepository) UpdateSettings(_ context.Context, _ 
 	return nil
 }
 
-func TestGetOrganizationSettingsReturnsDefaultCurrency(t *testing.T) {
-	repo := &mockOrganizationFeatureRepository{settings: &domain.OrganizationSettings{DefaultCurrency: "GBP"}}
+func TestGetOrganizationSettingsReturnsCurrency(t *testing.T) {
+	repo := &mockOrganizationFeatureRepository{settings: &domain.OrganizationSettings{Currency: "GBP"}}
 	h := handlerWithFeatureRepository(repo)
 	recorder := httptest.NewRecorder()
 
 	h.GetOrganizationSettings(recorder, httptest.NewRequest(http.MethodGet, "/api/organization/settings", nil))
 
-	if recorder.Code != http.StatusOK || recorder.Body.String() != "{\"default_currency\":\"GBP\"}\n" {
+	if recorder.Code != http.StatusOK || recorder.Body.String() != "{\"currency\":\"GBP\"}\n" {
 		t.Fatalf("unexpected response %d: %s", recorder.Code, recorder.Body.String())
 	}
 }
@@ -74,20 +74,20 @@ func TestUpdateOrganizationSettingsNormalizesCurrency(t *testing.T) {
 	repo := &mockOrganizationFeatureRepository{}
 	h := handlerWithFeatureRepository(repo)
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/api/organization/settings", strings.NewReader(`{"default_currency":" gbp "}`))
+	request := httptest.NewRequest(http.MethodPut, "/api/organization/settings", strings.NewReader(`{"currency":" gbp "}`))
 
 	h.UpdateOrganizationSettings(recorder, request)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
 	}
-	if repo.updatedSettings == nil || repo.updatedSettings.DefaultCurrency != "GBP" {
+	if repo.updatedSettings == nil || repo.updatedSettings.Currency != "GBP" {
 		t.Fatalf("expected GBP to be persisted, got %+v", repo.updatedSettings)
 	}
 }
 
 func TestUpdateOrganizationSettingsRejectsInvalidCurrency(t *testing.T) {
-	for _, body := range []string{`{"default_currency":"EURO"}`, `{"default_currency":"ZZZ"}`, `{"default_currency":""}`, `{}`} {
+	for _, body := range []string{`{"currency":"EURO"}`, `{"currency":"ZZZ"}`, `{"currency":""}`, `{}`} {
 		repo := &mockOrganizationFeatureRepository{}
 		h := handlerWithFeatureRepository(repo)
 		recorder := httptest.NewRecorder()

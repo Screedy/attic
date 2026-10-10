@@ -34,7 +34,6 @@ const form = reactive({
   attributes: {} as Record<string, string | number | boolean | string[] | undefined>,
   purchase_at: '',
   purchase_price: undefined as number | undefined,
-  currency: settings.value.default_currency,
   purchase_note: '',
   notes: ''
 })
@@ -44,12 +43,6 @@ watch(() => route.query.location_id, (locationId) => {
     form.location_id = locationId
   }
 }, { immediate: true })
-
-// Opened directly, the organization default may load after the form is created:
-// follow it until the user picks a currency themselves.
-watch(() => settings.value.default_currency, (next, previous) => {
-  if (form.currency === previous) form.currency = next
-})
 
 interface LocationOption {
   label: string
@@ -177,7 +170,6 @@ async function submitForm() {
       attributes: features.value.categories && Object.keys(form.attributes).length > 0 ? form.attributes : undefined,
       purchase_at: form.purchase_at || undefined,
       purchase_price: form.purchase_price || undefined,
-      currency: form.currency,
       purchase_note: form.purchase_note || undefined,
       notes: form.notes || undefined
     }
@@ -609,7 +601,8 @@ async function submitForm() {
               >
                 Purchase Price
               </label>
-              <div class="flex gap-2">
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 pointer-events-none">{{ settings.currency }}</span>
                 <input
                   id="asset-purchase-price"
                   v-model.number="form.purchase_price"
@@ -617,13 +610,8 @@ async function submitForm() {
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  class="block w-full min-w-0 flex-1 rounded-xl border border-mist-200 bg-white py-3 px-4 text-sm text-mist-950 shadow-sm placeholder:text-dimmed focus:border-attic-500 focus:ring-attic-500 dark:border-mist-600 dark:bg-mist-800 dark:text-white"
+                  class="block w-full rounded-xl border border-mist-200 bg-white py-3 pl-14 pr-4 text-sm text-mist-950 shadow-sm placeholder:text-dimmed focus:border-attic-500 focus:ring-attic-500 dark:border-mist-600 dark:bg-mist-800 dark:text-white"
                 >
-                <CurrencySelect
-                  v-model="form.currency"
-                  aria-label="Currency"
-                  size="lg"
-                />
               </div>
             </div>
           </div>

@@ -82,12 +82,12 @@ func (r *OrganizationRepository) Update(ctx context.Context, o *domain.Organizat
 
 func (r *OrganizationRepository) GetSettings(ctx context.Context, orgID uuid.UUID) (*domain.OrganizationSettings, error) {
 	settings := &domain.OrganizationSettings{}
-	err := r.pool.QueryRow(ctx, `SELECT default_currency FROM organizations WHERE id = $1`, orgID).Scan(&settings.DefaultCurrency)
+	err := r.pool.QueryRow(ctx, `SELECT currency FROM organizations WHERE id = $1`, orgID).Scan(&settings.Currency)
 	return settings, err
 }
 
 func (r *OrganizationRepository) UpdateSettings(ctx context.Context, orgID uuid.UUID, s *domain.OrganizationSettings) error {
-	_, err := r.pool.Exec(ctx, `UPDATE organizations SET default_currency = $2, updated_at = NOW() WHERE id = $1`, orgID, s.DefaultCurrency)
+	_, err := r.pool.Exec(ctx, `UPDATE organizations SET currency = $2, updated_at = NOW() WHERE id = $1`, orgID, s.Currency)
 	return err
 }
 

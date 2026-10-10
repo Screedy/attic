@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Location, Asset, AssetStats } from '~/types/api'
+import type { Location, Asset } from '~/types/api'
 import { getLocationNameError } from '~/utils/locationValidation'
 
 definePageMeta({
@@ -27,22 +27,10 @@ const { data: locationAssets, refresh: refreshAssets } = useApi<{ assets: Asset[
   { immediate: false, watch: false }
 )
 
-// Purchase value of every asset in the location (not just the loaded page), per currency
-const locationStatsUrl = computed(() =>
-  selectedLocation.value ? `/api/assets/stats?location_id=${selectedLocation.value.id}` : ''
-)
-const { data: locationStats, refresh: refreshLocationStats } = useApi<AssetStats>(
-  () => locationStatsUrl.value,
-  // Own key: with function URLs that start out empty, useApi calls would otherwise share
-  // one auto-generated key, and this refresh would re-run the assets request instead.
-  { key: 'location-purchase-values', immediate: false, watch: false }
-)
-
 // Watch selected location to fetch assets
 watch(selectedLocation, (loc) => {
   if (loc) {
     refreshAssets()
-    refreshLocationStats()
   }
 })
 
@@ -305,6 +293,23 @@ watch(searchQuery, (query) => {
 function hasChildren(locationId: string): boolean {
   return locations.value?.some(l => l.parent_id === locationId) || false
 }
+
+// Format currency
+const { settings } = useOrganizationSettings()
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: settings.value.currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value)
+}
+
+// Calculate total value of assets in location
+const totalValue = computed(() => {
+  if (!locationAssets.value?.assets) return 0
+  return locationAssets.value.assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0)
+})
 
 // Get icon for location based on explicit icon or fallback by name
 function getLocationIcon(location: Location): string {
@@ -576,11 +581,9 @@ function getLocationIcon(location: Location): string {
                         <p class="text-[10px] font-bold uppercase tracking-wider text-white/60">
                           Total value
                         </p>
-                        <PurchaseValues
-                          :key="selectedLocation.id"
-                          :values="locationStats?.purchase_values || {}"
-                          class="text-2xl font-black text-white"
-                        />
+                        <p class="text-2xl font-black text-white">
+                          {{ formatCurrency(totalValue) }}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -690,7 +693,7 @@ function getLocationIcon(location: Location): string {
                         v-if="asset.purchase_price"
                         class="absolute top-2 right-2 bg-white/90 dark:bg-black/80 backdrop-blur px-2 py-0.5 rounded-full text-[10px] font-bold text-mist-950 dark:text-white shadow-sm"
                       >
-                        {{ formatMoney(asset.purchase_price, asset.currency, 0) }}
+                        {{ formatCurrency(asset.purchase_price) }}
                       </div>
                     </div>
                     <div class="p-4 flex flex-col flex-1">

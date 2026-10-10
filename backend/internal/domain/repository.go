@@ -107,7 +107,7 @@ type AssetRepository interface {
 	Update(ctx context.Context, asset *Asset) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	SetTags(ctx context.Context, assetID uuid.UUID, tagIDs []uuid.UUID) error
-	GetPurchaseValues(ctx context.Context, orgID uuid.UUID, filter AssetFilter) (map[string]float64, error)
+	GetTotalValue(ctx context.Context, orgID uuid.UUID, filter AssetFilter) (float64, error)
 }
 
 // TagRepository handles tag persistence

@@ -32,7 +32,7 @@ type OrganizationFeatures struct {
 
 // OrganizationSettings holds organization-wide preferences.
 type OrganizationSettings struct {
-	DefaultCurrency string `json:"default_currency"` // ISO 4217 code preselected for new assets
+	Currency string `json:"currency"` // ISO 4217 code of every asset price; amounts are never converted
 }
 
 // UserRole represents the user's role in the system
@@ -192,7 +192,6 @@ type Asset struct {
 	Attributes       json.RawMessage `json:"attributes"`
 	PurchaseAt       *time.Time      `json:"purchase_at,omitempty"`
 	PurchasePrice    *float64        `json:"purchase_price,omitempty"`
-	Currency         string          `json:"currency"`
 	PurchaseNote     *string         `json:"purchase_note,omitempty"`
 	Notes            *string         `json:"notes,omitempty"`              // User personal notes about the asset
 	ImportPluginID   *string         `json:"import_plugin_id,omitempty"`   // Plugin that imported this asset

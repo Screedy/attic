@@ -11,7 +11,7 @@ const { features, featureRef, settingsRef, authLoading, fetchSession, load, upda
   return {
     features,
     featureRef: { __v_isRef: true, value: features },
-    settingsRef: { __v_isRef: true, value: { default_currency: 'USD' } },
+    settingsRef: { __v_isRef: true, value: { currency: 'USD' } },
     authLoading: { __v_isRef: true, value: false },
     fetchSession: vi.fn(),
     load: vi.fn(),
@@ -38,7 +38,7 @@ describe('organization feature settings', () => {
     authLoading.value = false
     Object.keys(features).forEach(key => features[key as keyof typeof features] = true)
     update.mockResolvedValue(features)
-    settingsRef.value = { default_currency: 'USD' }
+    settingsRef.value = { currency: 'USD' }
     updateSettings.mockResolvedValue(settingsRef.value)
   })
 
@@ -119,16 +119,16 @@ describe('organization feature settings', () => {
     wrapper.unmount()
   })
 
-  it('saves the default currency with the features', async () => {
-    settingsRef.value = { default_currency: 'GBP' }
+  it('saves the currency with the features', async () => {
+    settingsRef.value = { currency: 'GBP' }
     const wrapper = await mountSuspended(SettingsPage)
-    expect(wrapper.text()).toContain('Default currency')
+    expect(wrapper.text()).toContain('Used for all asset prices')
     const saveButton = wrapper.findAll('button').find(button => button.text().includes('Save changes'))!
     await saveButton.trigger('click')
     await flushPromises()
 
     expect(update).toHaveBeenCalledOnce()
-    expect(updateSettings).toHaveBeenCalledWith({ default_currency: 'GBP' })
+    expect(updateSettings).toHaveBeenCalledWith({ currency: 'GBP' })
     expect(toast).toHaveBeenCalledWith({ title: 'Settings saved', color: 'success' })
     wrapper.unmount()
   })

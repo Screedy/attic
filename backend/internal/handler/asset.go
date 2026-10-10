@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lmmendes/attic/internal/domain"
 	"github.com/lmmendes/attic/internal/repository"
-	"golang.org/x/text/currency"
 )
 
 const maxAssetQuantity = 1000000
@@ -33,13 +32,26 @@ type CreateAssetRequest struct {
 	Attributes    json.RawMessage `json:"attributes,omitempty"`
 	PurchaseAt    *string         `json:"purchase_at,omitempty"`
 	PurchasePrice *float64        `json:"purchase_price,omitempty"`
-	Currency      string          `json:"currency,omitempty"`
 	PurchaseNote  *string         `json:"purchase_note,omitempty"`
 	Notes         *string         `json:"notes,omitempty"`
 }
 
-// UpdateAssetRequest accepts the same fields as CreateAssetRequest (the AssetInput schema).
-type UpdateAssetRequest = CreateAssetRequest
+type UpdateAssetRequest struct {
+	CollectionIDs []string        `json:"collection_ids,omitempty"`
+	TagIDs        *[]string       `json:"tag_ids,omitempty"`
+	NewTagNames   *[]string       `json:"new_tag_names,omitempty"`
+	CategoryID    *string         `json:"category_id,omitempty"`
+	LocationID    *string         `json:"location_id,omitempty"`
+	ConditionID   *string         `json:"condition_id,omitempty"`
+	Name          string          `json:"name"`
+	Description   *string         `json:"description,omitempty"`
+	Quantity      int             `json:"quantity"`
+	Attributes    json.RawMessage `json:"attributes,omitempty"`
+	PurchaseAt    *string         `json:"purchase_at,omitempty"`
+	PurchasePrice *float64        `json:"purchase_price,omitempty"`
+	PurchaseNote  *string         `json:"purchase_note,omitempty"`
+	Notes         *string         `json:"notes,omitempty"`
+}
 
 type AssetListResponse struct {
 	Assets []AssetWithImageURL `json:"assets"`
@@ -322,10 +334,13 @@ func (h *Handler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 			asset.ConditionID = &id
 		}
 	}
-	if err := applyPurchase(asset, req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+	if req.PurchaseAt != nil && *req.PurchaseAt != "" {
+		if t, err := time.Parse("2006-01-02", *req.PurchaseAt); err == nil {
+			asset.PurchaseAt = &t
+		}
 	}
+	asset.PurchasePrice = req.PurchasePrice
+	asset.PurchaseNote = req.PurchaseNote
 	asset.Notes = req.Notes
 
 	asset.CollectionIDs = collectionIDs
@@ -476,10 +491,15 @@ func (h *Handler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	} else if features.Conditions {
 		asset.ConditionID = nil
 	}
-	if err := applyPurchase(asset, req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+	if req.PurchaseAt != nil && *req.PurchaseAt != "" {
+		if t, err := time.Parse("2006-01-02", *req.PurchaseAt); err == nil {
+			asset.PurchaseAt = &t
+		}
+	} else {
+		asset.PurchaseAt = nil
 	}
+	asset.PurchasePrice = req.PurchasePrice
+	asset.PurchaseNote = req.PurchaseNote
 	asset.Notes = req.Notes
 	if features.Collections {
 		asset.CollectionIDs = collectionIDs
@@ -622,62 +642,12 @@ func (h *Handler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-const currencyRequirement = "must be a known ISO 4217 currency code"
-
-var errInvalidCurrency = errors.New("currency " + currencyRequirement)
-
-// normalizeCurrency trims and uppercases an ISO 4217 code; ok is false unless it is a known currency.
-// x/text's table lacks a few recent codes (MRU, SLE, VES, XCG, ZWG), so the frontend picker hides them.
-func normalizeCurrency(s string) (string, bool) {
-	unit, err := currency.ParseISO(strings.TrimSpace(s))
-	if err != nil {
-		return "", false
-	}
-	return unit.String(), true
-}
-
-// applyPurchase copies the purchase fields of a create or update request onto the asset.
-// An empty purchase_at clears the date and an unparsable one is ignored; an empty currency
-// keeps the current one (on create, the repository then uses the organization's default).
-func applyPurchase(asset *domain.Asset, req CreateAssetRequest) error {
-	if req.PurchaseAt == nil || *req.PurchaseAt == "" {
-		asset.PurchaseAt = nil
-	} else if t, err := time.Parse("2006-01-02", *req.PurchaseAt); err == nil {
-		asset.PurchaseAt = &t
-	}
-	asset.PurchasePrice = req.PurchasePrice
-	if req.Currency != "" {
-		code, ok := normalizeCurrency(req.Currency)
-		if !ok {
-			return errInvalidCurrency
-		}
-		asset.Currency = code
-	}
-	asset.PurchaseNote = req.PurchaseNote
-	return nil
-}
-
 func parseUUIDString(s string) (uuid.UUID, error) {
 	return uuid.Parse(s)
 }
 
 type AssetStatsResponse struct {
-	PurchaseValues map[string]float64 `json:"purchase_values"` // Purchase value (price × quantity) per currency code
-	// Deprecated: use PurchaseValues. Kept for clients written before multi-currency support;
-	// Omitted once assets use more than one currency, because their sum has no meaning.
-	TotalValue *float64 `json:"total_value,omitempty"`
-}
-
-func newAssetStatsResponse(purchaseValues map[string]float64) AssetStatsResponse {
-	resp := AssetStatsResponse{PurchaseValues: purchaseValues}
-	if len(purchaseValues) <= 1 {
-		var total float64
-		for _, value := range purchaseValues {
-			total = value
-		}
-		resp.TotalValue = &total // Deprecated field; kept for clients written before multi-currency support.
-	}
-	return resp
+	TotalValue float64 `json:"total_value"`
 }
 
 func (h *Handler) GetAssetStats(w http.ResponseWriter, r *http.Request) {
@@ -700,11 +670,13 @@ func (h *Handler) GetAssetStats(w http.ResponseWriter, r *http.Request) {
 		filter.LocationID = &id
 	}
 
-	purchaseValues, err := h.repos.Assets.GetPurchaseValues(r.Context(), h.orgID, filter)
+	totalValue, err := h.repos.Assets.GetTotalValue(r.Context(), h.orgID, filter)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get asset stats")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newAssetStatsResponse(purchaseValues))
+	writeJSON(w, http.StatusOK, AssetStatsResponse{
+		TotalValue: totalValue,
+	})
 }

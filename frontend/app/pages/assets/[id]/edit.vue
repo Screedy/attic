@@ -12,6 +12,7 @@ const router = useRouter()
 const toast = useToast()
 const apiFetch = useApiFetch()
 const { features } = useFeatures()
+const { settings } = useOrganizationSettings()
 
 const assetUrl = computed(() => `/api/assets/${route.params.id}`)
 const { data: asset, status: assetStatus, clear: clearAsset } = useApi<Asset>(
@@ -44,7 +45,6 @@ const form = reactive({
   attributes: {} as Record<string, string | number | boolean | string[] | undefined>,
   purchase_at: '',
   purchase_price: undefined as number | undefined,
-  currency: DEFAULT_CURRENCY,
   purchase_note: '',
   notes: ''
 })
@@ -72,7 +72,6 @@ watch(
         : {}
       form.purchase_at = newAsset.purchase_at?.split('T')[0] || ''
       form.purchase_price = newAsset.purchase_price ?? undefined
-      form.currency = newAsset.currency || DEFAULT_CURRENCY
       form.purchase_note = newAsset.purchase_note || ''
       form.notes = newAsset.notes || ''
       detailsOpen.value = Boolean(
@@ -231,7 +230,6 @@ async function submitForm() {
         : undefined,
       purchase_at: form.purchase_at || undefined,
       purchase_price: form.purchase_price ?? undefined,
-      currency: form.currency,
       purchase_note: form.purchase_note || undefined,
       notes: form.notes || undefined
     }
@@ -686,20 +684,16 @@ async function submitForm() {
                 <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Purchase Price
                 </label>
-                <div class="flex gap-2">
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 pointer-events-none">{{ settings.currency }}</span>
                   <input
                     v-model.number="form.purchase_price"
                     type="number"
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    class="block w-full min-w-0 flex-1 rounded-xl border-mist-200 bg-white py-3 px-4 text-sm text-mist-950 shadow-sm placeholder:text-dimmed focus:border-attic-500 focus:ring-attic-500 dark:border-mist-600 dark:bg-mist-800 dark:text-white"
+                    class="block w-full rounded-xl border-mist-200 bg-white py-3 pl-14 pr-4 text-sm text-mist-950 shadow-sm placeholder:text-dimmed focus:border-attic-500 focus:ring-attic-500 dark:border-mist-600 dark:bg-mist-800 dark:text-white"
                   >
-                  <CurrencySelect
-                    v-model="form.currency"
-                    aria-label="Currency"
-                    size="lg"
-                  />
                 </div>
               </div>
             </div>
