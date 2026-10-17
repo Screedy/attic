@@ -5,6 +5,11 @@ definePageMeta({ middleware: 'auth' })
 const { isAdmin, loading: authLoading, fetchSession } = useAuth()
 const { features, load, update } = useFeatures()
 const { settings, load: loadSettings, update: updateSettings } = useOrganizationSettings()
+// Edit a copy, so an unsaved choice doesn't change prices on other pages; it follows the saved value.
+const currency = ref(settings.value.currency)
+watch(() => settings.value.currency, (saved) => {
+  currency.value = saved
+})
 const toast = useToast()
 const saving = ref(false)
 const labels: Array<{ key: keyof OrganizationFeatures, label: string, description: string }> = [
@@ -29,10 +34,11 @@ async function save() {
       ...features.value,
       attributes: features.value.categories
     })
-    await updateSettings(settings.value)
+    await updateSettings({ currency: currency.value })
     toast.add({ title: 'Settings saved', color: 'success' })
   } catch {
     await Promise.all([load(), loadSettings()])
+    currency.value = settings.value.currency
     toast.add({ title: 'Could not save settings', color: 'error' })
   } finally {
     saving.value = false
@@ -80,7 +86,7 @@ async function save() {
             </p>
           </div>
           <USelectMenu
-            v-model="settings.currency"
+            v-model="currency"
             aria-label="Currency"
             :items="currencies"
             class="w-28 shrink-0"

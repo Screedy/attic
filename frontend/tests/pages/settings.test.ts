@@ -32,6 +32,12 @@ mockNuxtImport('useFeatures', () => () => ({ features: featureRef, load, update 
 mockNuxtImport('useOrganizationSettings', () => () => ({ settings: settingsRef, load: loadSettings, update: updateSettings }))
 mockNuxtImport('useToast', () => () => ({ add: toast }))
 
+const currencyMenu = {
+  props: ['modelValue'],
+  emits: ['update:modelValue'],
+  template: '<button aria-label="Currency" @click="$emit(\'update:modelValue\', \'CZK\')">{{ modelValue }}</button>'
+}
+
 describe('organization feature settings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -130,6 +136,34 @@ describe('organization feature settings', () => {
     expect(update).toHaveBeenCalledOnce()
     expect(updateSettings).toHaveBeenCalledWith({ currency: 'GBP' })
     expect(toast).toHaveBeenCalledWith({ title: 'Settings saved', color: 'success' })
+    wrapper.unmount()
+  })
+
+  it('keeps an unsaved currency choice on this page until it is saved', async () => {
+    const wrapper = await mountSuspended(SettingsPage, { global: { stubs: { USelectMenu: currencyMenu } } })
+    await wrapper.get('button[aria-label="Currency"]').trigger('click')
+
+    expect(wrapper.get('button[aria-label="Currency"]').text()).toBe('CZK')
+    expect(settingsRef.value.currency).toBe('USD')
+
+    const saveButton = wrapper.findAll('button').find(button => button.text().includes('Save changes'))!
+    await saveButton.trigger('click')
+    await flushPromises()
+    expect(updateSettings).toHaveBeenCalledWith({ currency: 'CZK' })
+    wrapper.unmount()
+  })
+
+  it('puts the saved currency back after a failed save', async () => {
+    updateSettings.mockRejectedValueOnce(new Error('save failed'))
+    const wrapper = await mountSuspended(SettingsPage, { global: { stubs: { USelectMenu: currencyMenu } } })
+    await wrapper.get('button[aria-label="Currency"]').trigger('click')
+    const saveButton = wrapper.findAll('button').find(button => button.text().includes('Save changes'))!
+    await saveButton.trigger('click')
+    await flushPromises()
+
+    expect(loadSettings).toHaveBeenCalledOnce()
+    expect(wrapper.get('button[aria-label="Currency"]').text()).toBe('USD')
+    expect(toast).toHaveBeenCalledWith({ title: 'Could not save settings', color: 'error' })
     wrapper.unmount()
   })
 })
